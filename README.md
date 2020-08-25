@@ -47,6 +47,10 @@ Ajouter le `host` dans votre fichier **local** `/etc/hosts` sur l'ip `127.0.0.1`
 127.0.0.1       application.local
 ```
 
+# Applicatif 
+
+Vous devez créer le sous repertoire symfony et y installer votre projet symfony.
+
 ## Traefik
 
 C'est `Traefik` qui va se charger de savoir si tel host est accessible depuis tel ou tel container .
