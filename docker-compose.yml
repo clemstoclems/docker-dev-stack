@@ -129,7 +129,6 @@ services:
   mongo:
     image: mongo:${MONGO_TAG}
     container_name: mongo_omnistack
-    networks: ['omnistack']
     volumes:
       - "${DEV_STACK_ROOT_DIR}/storage/mongo:/data"
     ports: ['${MONGO_PUBLIC_PORT}:${MONGO_PRIVATE_PORT}']
@@ -139,6 +138,7 @@ services:
       - "traefik.http.routers.mongo_omnistack.rule=Host(`${MONGO_TRAEFIK_LABEL}`)"
       - "traefik.http.services.mongo_omnistack.loadbalancer.server.port=${MONGO_PRIVATE_PORT}"
       - "traefik.http.routers.mongo_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+    networks: ['omnistack']
 
   # ========================
   # MySQL
@@ -146,10 +146,6 @@ services:
   mysql:
     image: mysql:${MYSQL_TAG}
     container_name: mysql_omnistack
-    networks:
-      omnistack:
-        aliases:
-          - "db"
     env_file:
       - config/env_files/mysql.env
     volumes:
@@ -161,6 +157,10 @@ services:
       - "traefik.http.routers.mysql_omnistack.rule=Host(`${MYSQL_TRAEFIK_LABEL}`)"
       - "traefik.http.services.mysql_omnistack.loadbalancer.server.port=${MYSQL_PRIVATE_PORT}"
       - "traefik.http.routers.mysql_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+    networks:
+      omnistack:
+        aliases:
+          - "db"
 
   # ========================
   # RabbitMQ
@@ -168,7 +168,6 @@ services:
   rabbit:
     image: rabbitmq:${RABBITMQ_TAG}
     container_name: rabbit_omnistack
-    networks: ["omnistack"]
     ports:
       - "${RABBIT_MQ_PUBLIC_PORT_1}:${RABBIT_MQ_PRIVATE_PORT_1}"
       - "${RABBIT_MQ_PUBLIC_PORT_2}:${RABBIT_MQ_PRIVATE_PORT_2}"
@@ -179,13 +178,14 @@ services:
       - "traefik.http.routers.rabbitmq_omnistack.rule=Host(`${RABBIT_MQ_TRAEFIK_LABEL}`)"
       - "traefik.http.services.rabbitmq_omnistack.loadbalancer.server.port=${RABBIT_MQ_PRIVATE_PORT_1}"
       - "traefik.http.routers.rabbitmq_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+    networks: ["omnistack"]
+
   # ========================
   # Redis
   # ========================
   redis:
     image: redis:${REDIS_TAG}
     container_name: redis_omnistack
-    networks: ["omnistack"]
     volumes:
       - "${DEV_STACK_ROOT_DIR}/storage/redis:/data"
     ports: ['${REDIS_PUBLIC_PORT}:${REDIS_PRIVATE_PORT}']
@@ -195,24 +195,32 @@ services:
       - "traefik.http.routers.redis_omnistack.rule=Host(`${REDIS_TRAEFIK_LABEL}`)"
       - "traefik.http.services.redis_omnistack.loadbalancer.server.port=${REDIS_PRIVATE_PORT}"
       - "traefik.http.routers.redis_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+    networks: ["omnistack"]
 
   # ========================
   # Application
   # ========================
-#  app:
-#    build: .
-#    container_name: application_omnistack
-#    volumes:
-#      - '.:/data/www/'
-#    restart: always
-#    ports: ['${APPLICATION_PUBLIC_PORT}:${APPLICATION_PRIVATE_PORT}']
-#    labels:
-#      - "traefik.enable=true"
-#      - "traefik.http.routers.application_omnistack.rule=Host(`${APPLICATION_TRAEFIK_LABEL}`)"
-#      - "traefik.http.services.application_omnistack.loadbalancer.server.port=${APPLICATION_PRIVATE_PORT}"
-#      - "traefik.http.routers.application_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
-#    networks: ["omnistack"]
+  php:
+    build: ./docker/php/
+    container_name: php_omnistack
+    volumes: ['./symfony/:/var/www/symfony:cached']
+    labels:
+      - "traefik.enable=false"
+    networks: ['omnistack']
 
+  nginx:
+    build: ./docker/nginx
+    container_name: nginx_omnistack
+    ports: ['${NGINX_PUBLIC_PORT}:${NGINX_PRIVATE_PORT}']
+    depends_on:
+      - php
+    volumes: ['./symfony/:/var/www/symfony:cached']
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nginx_omnistack.rule=Host(`${NGINX_TRAEFIK_LABEL}`)"
+      - "traefik.http.services.nginx_omnistack.loadbalancer.server.port=${NGINX_PRIVATE_PORT}"
+      - "traefik.http.routers.nginx_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+    networks: ['omnistack']
 
 volumes:
   elastic-storage:
