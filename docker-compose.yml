@@ -1,0 +1,219 @@
+---
+version: '3.7'
+networks:
+  omnistack:
+    driver: bridge
+services:
+  # ========================
+  # Reverse Proxy Traefik
+  # ========================
+  traefik2:
+    image: "traefik:${TRAEFIK_TAG}"
+    container_name: "traefik_omnistack"
+    command:
+      - "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.${OMNISTACK_ENTRYPOINT}.address=:80"
+      - "--entrypoints.${OMNISTACK_SECURE_ENTRYPOINT}.address=:443"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks: ["omnistack"]
+
+  # ========================
+  # Web UI Portainer
+  # ========================
+  portainer:
+    image: portainer/portainer:${PORTAINER_TAG}
+    container_name: portainer_omnistack
+    ports: ['${PORTAINER_PUBLIC_PORT}:${PORTAINER_PRIVATE_PORT}']
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+      - '/opt/portainer/data:/data'
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer_omnistack.rule=Host(`${PORTAINER_TRAEFIK_LABEL}`)"
+      - "traefik.http.services.portainer_omnistack.loadbalancer.server.port=${PORTAINER_PRIVATE_PORT}"
+      - "traefik.http.routers.portainer_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+    networks: ["omnistack"]
+
+  # ========================
+  # ELK: Elasticsearch
+  # ========================
+  elasticsearchelk:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_ELK_TAG}
+    container_name: elasticsearchelk_omnistack
+    volumes:
+      - "${DEV_STACK_ROOT_DIR}/storage/elk/elasticsearch:/usr/share/elasticsearch/data"
+    ports: ['${ELASTIC_PUBLIC_PORT}:${ELASTIC_PRIVATE_PORT}']
+    env_file:
+      - config/env_files/elastic.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.elasticsearchelk_omnistack.rule=Host(`${ELASTIC_TRAEFIK_LABEL}`)"
+      - "traefik.http.services.elasticsearchelk_omnistack.loadbalancer.server.port=${ELASTIC_PRIVATE_PORT}"
+      - "traefik.http.routers.elasticsearchelk_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+    networks:
+      omnistack:
+        aliases:
+          - "elasticsearchelk"
+
+  # ========================
+  # ELK : Logstash
+  # ========================
+  logstash:
+    image: elastic/logstash:${LOGSTASH_TAG}
+    container_name: logstash_omnistack
+    hostname: logstash
+    volumes:
+      - "${DEV_STACK_ROOT_DIR}/config/elk/logstash/pipeline:/usr/share/logstash/pipeline:ro"
+    depends_on: [ elasticsearchelk ]
+    ports: ['${LOGSTASH_PUBLIC_PORT}:${LOGSTASH_PRIVATE_PORT}']
+    env_file:
+      - config/env_files/logstash.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.logstash_omnistack.rule=Host(`${LOGSTASH_TRAEFIK_LABEL}`)"
+      - "traefik.http.services.logstash_omnistack.loadbalancer.server.port=${LOGSTASH_PRIVATE_PORT}"
+      - "traefik.http.routers.logstash_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+    networks: ["omnistack"]
+
+  # ========================
+  # ELK : Kibana
+  # ========================
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${KIBANA_TAG}
+    container_name: kibana_omnistack
+    command: [ "/usr/local/bin/kibana-scripts/entrypoint.sh" ]
+    volumes:
+      - "${DEV_STACK_ROOT_DIR}/config/elk/kibana/scripts:/usr/local/bin/kibana-scripts"
+    depends_on: [ elasticsearchelk, logstash ]
+    ports: ['${KIBANA_PUBLIC_PORT}:${KIBANA_PRIVATE_PORT}']
+    env_file:
+      - config/env_files/kibana.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.kibana_omnistack.rule=Host(`${KIBANA_TRAEFIK_LABEL}`)"
+      - "traefik.http.services.kibana_omnistack.loadbalancer.server.port=${KIBANA_PRIVATE_PORT}"
+      - "traefik.http.routers.kibana_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+    networks: ["omnistack"]
+
+  # ========================
+  # Grafana
+  # ========================
+  grafana:
+    image: grafana/grafana:${GRAFANA_TAG}
+    container_name: grafana_omnistack
+    links:
+      - mysql:mysql
+    volumes:
+      - 'grafana-storage:/var/lib/grafana'
+    ports: ['${GRAFANA_PUBLIC_PORT}:${GRAFANA_PRIVATE_PORT}']
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana_omnistack.rule=Host(`${GRAFANA_TRAEFIK_LABEL}`)"
+      - "traefik.http.services.grafana_omnistack.loadbalancer.server.port=${GRAFANA_PRIVATE_PORT}"
+      - "traefik.http.routers.grafana_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+    networks: ["omnistack"]
+
+  # ========================
+  # Mongo DB
+  # ========================
+  mongo:
+    image: mongo:${MONGO_TAG}
+    container_name: mongo_omnistack
+    networks: ['omnistack']
+    volumes:
+      - "${DEV_STACK_ROOT_DIR}/storage/mongo:/data"
+    ports: ['${MONGO_PUBLIC_PORT}:${MONGO_PRIVATE_PORT}']
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mongo_omnistack.rule=Host(`${MONGO_TRAEFIK_LABEL}`)"
+      - "traefik.http.services.mongo_omnistack.loadbalancer.server.port=${MONGO_PRIVATE_PORT}"
+      - "traefik.http.routers.mongo_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+
+  # ========================
+  # MySQL
+  # ========================
+  mysql:
+    image: mysql:${MYSQL_TAG}
+    container_name: mysql_omnistack
+    networks:
+      omnistack:
+        aliases:
+          - "db"
+    env_file:
+      - config/env_files/mysql.env
+    volumes:
+      - "${DEV_STACK_ROOT_DIR}/storage/mysql:/var/lib/mysql"
+    ports: ['${MYSQL_PUBLIC_PORT}:${MYSQL_PRIVATE_PORT}']
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mysql_omnistack.rule=Host(`${MYSQL_TRAEFIK_LABEL}`)"
+      - "traefik.http.services.mysql_omnistack.loadbalancer.server.port=${MYSQL_PRIVATE_PORT}"
+      - "traefik.http.routers.mysql_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+
+  # ========================
+  # RabbitMQ
+  # ========================
+  rabbit:
+    image: rabbitmq:${RABBITMQ_TAG}
+    container_name: rabbit_omnistack
+    networks: ["omnistack"]
+    ports:
+      - "${RABBIT_MQ_PUBLIC_PORT_1}:${RABBIT_MQ_PRIVATE_PORT_1}"
+      - "${RABBIT_MQ_PUBLIC_PORT_2}:${RABBIT_MQ_PRIVATE_PORT_2}"
+      - "${RABBIT_MQ_PUBLIC_PORT_3}:${RABBIT_MQ_PRIVATE_PORT_3}"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rabbitmq_omnistack.rule=Host(`${RABBIT_MQ_TRAEFIK_LABEL}`)"
+      - "traefik.http.services.rabbitmq_omnistack.loadbalancer.server.port=${RABBIT_MQ_PRIVATE_PORT_1}"
+      - "traefik.http.routers.rabbitmq_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+  # ========================
+  # Redis
+  # ========================
+  redis:
+    image: redis:${REDIS_TAG}
+    container_name: redis_omnistack
+    networks: ["omnistack"]
+    volumes:
+      - "${DEV_STACK_ROOT_DIR}/storage/redis:/data"
+    ports: ['${REDIS_PUBLIC_PORT}:${REDIS_PRIVATE_PORT}']
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.redis_omnistack.rule=Host(`${REDIS_TRAEFIK_LABEL}`)"
+      - "traefik.http.services.redis_omnistack.loadbalancer.server.port=${REDIS_PRIVATE_PORT}"
+      - "traefik.http.routers.redis_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+
+  # ========================
+  # Application
+  # ========================
+#  app:
+#    build: .
+#    container_name: application_omnistack
+#    volumes:
+#      - '.:/data/www/'
+#    restart: always
+#    ports: ['${APPLICATION_PUBLIC_PORT}:${APPLICATION_PRIVATE_PORT}']
+#    labels:
+#      - "traefik.enable=true"
+#      - "traefik.http.routers.application_omnistack.rule=Host(`${APPLICATION_TRAEFIK_LABEL}`)"
+#      - "traefik.http.services.application_omnistack.loadbalancer.server.port=${APPLICATION_PRIVATE_PORT}"
+#      - "traefik.http.routers.application_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+#    networks: ["omnistack"]
+
+
+volumes:
+  elastic-storage:
+  grafana-storage:
