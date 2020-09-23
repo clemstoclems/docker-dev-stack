@@ -105,6 +105,24 @@ services:
     networks: ["omnistack"]
 
   # ========================
+  # Event Store
+  # ========================
+  event-store:
+    image: eventstore/eventstore:release-5.0.7
+    container_name: eventstore_omnistack
+    ports:
+      - "${EVENT_STORE_PUBLIC_PORT_1}:${EVENT_STORE_PRIVATE_PORT_1}"
+      - "${EVENT_STORE_PUBLIC_PORT_2}:${EVENT_STORE_PRIVATE_PORT_2}"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.eventstore_omnistack.rule=Host(`${EVENT_STORE_TRAEFIK_LABEL}`)"
+      - "traefik.http.services.eventstore_omnistack.loadbalancer.server.port=${EVENT_STORE_PRIVATE_PORT}"
+      - "traefik.http.routers.eventstore_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+    networks: [ "omnistack" ]
+
+
+  # ========================
   # Grafana
   # ========================
   grafana:

@@ -4,7 +4,6 @@ LABEL maintainer="Janosch Kocsis <jk@coloso.de>"
 RUN apk add --update \
     make \
     curl \
-    nodejs \
     yarn
 
 RUN docker-php-ext-install mysqli pdo pdo_mysql
