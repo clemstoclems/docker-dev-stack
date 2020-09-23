@@ -1,10 +1,15 @@
 FROM php:7.4-fpm-alpine
-LABEL maintainer="Janosch Kocsis <jk@coloso.de>"
+
+ARG ENABLE_XDEBUG
 
 RUN apk add --update \
+    build-base \
+    autoconf \
+    rabbitmq-c-dev \
     make \
-    curl \
-    yarn
+    curl
+
+RUN pecl install amqp && docker-php-ext-enable amqp
 
 RUN docker-php-ext-install mysqli pdo pdo_mysql
 
@@ -15,9 +20,16 @@ ENV PATH=$PATH:/root/composer/vendor/bin COMPOSER_ALLOW_SUPERUSER=1
 ADD php.ini /etc/php/conf.d/
 ADD php.ini /etc/php/cli/conf.d/
 ADD php-fpm.conf /etc/php/php-fpm.d/
-#ADD xdebug.ini  /etc/php/conf.d/
 
-WORKDIR /var/www/symfony
+RUN if [ "${ENABLE_XDEBUG}" == "on" ]; then \
+        yes | pecl install xdebug \
+        && docker-php-ext-enable xdebug \
+        && echo "xdebug.remote_enable=on" >> /usr/local/etc/php/conf.d/xdebug.ini \
+        && echo "xdebug.remote_autostart=on" >> /usr/local/etc/php/conf.d/xdebug.ini \
+        && echo "xdebug.remote_connect_back=1" >> /usr/local/etc/php/conf.d/xdebug.ini; \
+    fi
+
+WORKDIR /var/www/web
 
 EXPOSE 9000
 
