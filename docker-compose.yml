@@ -215,6 +215,23 @@ services:
     networks: ["omnistack"]
 
   # ========================
+  # Varnish
+  # ========================
+  varnish:
+    image: varnish:${VARNISH_TAG}
+    container_name: varnish_omnistack
+    env_file:
+      - config/env_files/varnish.env
+    volumes:
+      - "${DEV_STACK_ROOT_DIR}/config/varnish/default.vcl:/etc/varnish/default.vcl"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.varnish_omnistack.rule=Host(`${VARNISH_TRAEFIK_LABEL}`)"
+      - "traefik.http.services.varnish_omnistack.loadbalancer.server.port=${VARNISH_PRIVATE_PORT}"
+      - "traefik.http.routers.varnish_omnistack.entrypoints=${OMNISTACK_ENTRYPOINT}"
+    networks: ['omnistack']
+
+  # ========================
   # Application
   # ========================
   php:
