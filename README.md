@@ -12,6 +12,7 @@ voici la liste des images actuellement utilisées :
 | [docker.elastic.co/elasticsearch/elasticsearch](https://www.docker.elastic.co) | 7.7.0 | elasticsearch |
 | [docker.elastic.co/kibana/kibana](https://www.docker.elastic.co) | 7.7.0 | kibana | 
 | [elastic/logstash](https://www.elastic.co/guide/en/logstash/current/docker.html) | 7.7.0 | logstash | 
+| [evenstore/eventstore](https://hub.docker.com/r/eventstore/eventstore) | release-5.0.7 | event-store | 
 | [symfony-docker](https://github.com/coloso/symfony-docker) | latest | php7.4 |
 | [symfony-docker](https://github.com/coloso/symfony-docker) | latest | nginx |
 | [mysql](https://hub.docker.com/_/mysql) | 5.7 | mysql |
