@@ -11,7 +11,7 @@ RUN apk add --update \
 
 RUN pecl install amqp && docker-php-ext-enable amqp
 
-RUN docker-php-ext-install mysqli pdo pdo_mysql
+RUN docker-php-ext-install pcntl
 
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer && \
     ln -s $(composer config --global home) /root/composer
